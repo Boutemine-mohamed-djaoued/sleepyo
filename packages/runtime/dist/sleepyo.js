@@ -74,8 +74,14 @@ function addEventListeners(listeners = {},el){
   return addedListeneres
 }
 function addEventListener(eventName, handler, el) {
+  console.log({el,eventName,handler});
   el.addEventListener(eventName, handler);
   return handler;
+}
+function removeEventListeners(listeners, el) {
+  Object.entries(listeners).forEach(([eventName, handler]) => {
+    el.removeEventListener(eventName, handler);
+  });
 }
 
 function mountDOM(vdom, parentEl) {
@@ -125,13 +131,54 @@ function createFragmentNode(vdom, parentEl) {
   parentEl.append(fragmentNode);
 }
 
+function destroyDom(vdom) {
+  switch (vdom.type) {
+    case DOM_TYPES.ELEMENT: {
+      removeElementNode(vdom);
+      break;
+    }
+    case DOM_TYPES.TEXT: {
+      removeTextNode(vdom);
+      break;
+    }
+    case DOM_TYPES.FRAGMENT: {
+      removeFragmentNode(vdom);
+      break;
+    }
+    default: {
+      throw new Error("Can't destroy DOM of type: ${type}");
+    }
+  }
+  delete vdom.el;
+}
+function removeElementNode(vdom) {
+  const { el, children, listeners } = vdom;
+  el.remove();
+  children.forEach(destroyDom);
+  if (listeners) {
+    removeEventListeners(listeners, el);
+    delete vdom.listeners;
+  }
+}
+function removeTextNode(vdom) {
+  const { el } = vdom;
+  el.remove();
+}
+function removeFragmentNode(vdom) {
+  const { children } = vdom;
+  children.forEach(destroyDom);
+}
+
 console.log("This will soon be a frontend framework!");
 const login = () => {
   console.log("Logging in...");
 };
-const VDOM = hElement("form", { class: "login-form", action: "login" }, [
+const VDOM = hElement("div", { class: "hello there" }, [
   hElement("input", { type: "text", name: "user" }),
   hElement("input", { type: "password", name: "pass" }),
   hElement("button", { on: { click: login } }, ["Login"]),
 ]);
-mountDOM(VDOM, document.querySelector("body"));
+mountDOM(VDOM, document.body);
+setTimeout(() => {
+  destroyDom(VDOM);
+}, 3000);
