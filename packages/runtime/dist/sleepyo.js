@@ -169,16 +169,78 @@ function removeFragmentNode(vdom) {
   children.forEach(destroyDom);
 }
 
+class Dispatcher {
+  #subs = new Map()
+  #afterHandlers = []
+  subscribe(commandName,handler){
+    if(!this.#subs.has(commandName)){
+      this.#subs.set(commandName,[]);
+    }
+    const handlers = this.#subs.get(commandName);
+    if (handlers.includes(handler)){
+      return ()=>{}
+    }
+    handlers.push(handler);
+    return ()=>{
+      const idx = handlers.indexOf(handler);
+      handlers.splice(idx,1);
+    }
+  }
+  afterEveryCommand(handler){
+    this.#afterHandlers.push(handler);
+    return ()=>{
+      const idx = this.#afterHandlers.indexOf(handler);
+      this.#afterHandlers.splice(idx,1);
+    }
+  }
+  dispatch(commandName,payload){
+    if (this.#subs.has(commandName)){
+      this.#subs.get(commandName).forEach((handler) => handler(payload));
+    }else {
+      console.warn(`No handlers for command: ${commandName}`);
+    }
+    this.#afterHandlers.forEach((handler) => handler());
+  }
+}
+
+function createApp({ state, view, reducers = {} }) {
+  let parentEl = null;
+  let vdom = null;
+  const dispatcher = new Dispatcher();
+  const subscriptions = [dispatcher.afterEveryCommand(renderApp)];
+  function emit(eventName, payload) {
+    dispatcher.dispatch(eventName, payload);
+  }
+  for (const actionName in reducers) {
+    const reducer = reducers[actionName];
+    const sub = dispatcher.subscribe(actionName, (payload) => {
+      state = reducer(state, payload);
+    });
+    subscriptions.push(sub);
+  }
+  function renderApp() {
+    if (vdom) destroyDom(vdom);
+    vdom = view(state, emit);
+    mountDOM(vdom, parentEl);
+  }
+  return {
+    mount(_parentEl) {
+      parentEl = _parentEl;
+      renderApp();
+    },
+    unmount() {
+      destroyDom(vdom);
+      vdom = null;
+      subscriptions.forEach((unsubscribe) => unsubscribe());
+    },
+  };
+}
+
 console.log("This will soon be a frontend framework!");
-const login = () => {
-  console.log("Logging in...");
-};
-const VDOM = hElement("div", { class: "hello there" }, [
-  hElement("input", { type: "text", name: "user" }),
-  hElement("input", { type: "password", name: "pass" }),
-  hElement("button", { on: { click: login } }, ["Login"]),
-]);
-mountDOM(VDOM, document.body);
-setTimeout(() => {
-  destroyDom(VDOM);
-}, 3000);
+createApp({
+  state: 0,
+  reducers: {
+    add: (state, amount) => state + amount,
+  },
+  view: (state, emit) => hElement("button", { on: { click: () => emit("add", 1) } }, [hText(state)]),
+}).mount(document.body);
