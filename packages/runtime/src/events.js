@@ -10,7 +10,6 @@ export function addEventListeners(listeners = {},el){
 }
 
 export function addEventListener(eventName, handler, el) {
-  console.log({el,eventName,handler})
   el.addEventListener(eventName, handler);
   return handler;
 }

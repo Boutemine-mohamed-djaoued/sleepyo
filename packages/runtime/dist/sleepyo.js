@@ -24,45 +24,11 @@ function hText(value) {
     type: DOM_TYPES.TEXT,
   };
 }
-
-function setAttributes(el, attrs) {
-  const { class: className, style, ...otherAttrs } = attrs;
-  if (className) {
-    setClass(el, className);
-  }
-  if (style) {
-    Object.entries(style).forEach(([prop, value]) => {
-      setStyle(el, prop, value);
-    });
-  }
-  for (const [name, value] of Object.entries(otherAttrs)) {
-    setAttribute(el, name, value);
-  }
-}
-function setClass(el, className) {
-  el.className = "";
-  if (typeof className === "string") {
-    el.className = className;
-  }
-  if (Array.isArray(className)) {
-    el.classList.add(...className);
-  }
-}
-function setStyle(el, name, value) {
-  el.style[name] = value;
-}
-function setAttribute(el, name, value) {
-  if (value == null) {
-    removeAttribute(el,name);
-  } else if (name.startsWith("data-")) {
-    el.setAttribute(name, value);
-  } else {
-    el[name] = value;
-  }
-}
-function removeAttribute(el,name){
-  el[name] = null;
-  el.removeAttribute(name);
+function hFragment(children = {}) {
+  return {
+    children: mapTextNodes(withoutNulls(children)),
+    type: DOM_TYPES.FRAGMENT,
+  };
 }
 
 function addEventListeners(listeners = {},el){
@@ -74,7 +40,6 @@ function addEventListeners(listeners = {},el){
   return addedListeneres
 }
 function addEventListener(eventName, handler, el) {
-  console.log({el,eventName,handler});
   el.addEventListener(eventName, handler);
   return handler;
 }
@@ -82,53 +47,6 @@ function removeEventListeners(listeners, el) {
   Object.entries(listeners).forEach(([eventName, handler]) => {
     el.removeEventListener(eventName, handler);
   });
-}
-
-function mountDOM(vdom, parentEl) {
-  switch (vdom.type) {
-    case DOM_TYPES.ELEMENT: {
-      createElementNode(vdom, parentEl);
-      break;
-    }
-    case DOM_TYPES.TEXT: {
-      createTextNode(vdom, parentEl);
-      break;
-    }
-    case DOM_TYPES.FRAGMENT: {
-      createFragmentNode(vdom, parentEl);
-      break;
-    }
-    default: {
-      throw new Error(`Can't mount DOM of type: ${vdom.type}`);
-    }
-  }
-}
-function createElementNode(vdom, parentEl) {
-  const elementNode = document.createElement(vdom.tag);
-  vdom.el = elementNode;
-  addProps(elementNode,vdom.props,vdom);
-  vdom.children.forEach((child)=>{
-    mountDOM(child, elementNode);
-  });
-  parentEl.append(elementNode);
-}
-function addProps(el,props,vdom){
-  const {on : events , ...attributes} = props;
-  vdom.listeners = addEventListeners(events,el);
-  setAttributes(el,attributes);
-}
-function createTextNode(vdom, parentEl) {
-  const textNode = document.createTextNode(vdom.value);
-  vdom.el = textNode ;
-  parentEl.append(textNode);
-}
-function createFragmentNode(vdom, parentEl) {
-  const fragmentNode = document.createFragmentNode();
-  vdom.el = parentEl;
-  vdom.children.forEach((child) => {
-    mountDOM(child, fragmentNode);
-  });
-  parentEl.append(fragmentNode);
 }
 
 function destroyDom(vdom) {
@@ -203,6 +121,93 @@ class Dispatcher {
   }
 }
 
+function setAttributes(el, attrs) {
+  const { class: className, style, ...otherAttrs } = attrs;
+  if (className) {
+    setClass(el, className);
+  }
+  if (style) {
+    Object.entries(style).forEach(([prop, value]) => {
+      setStyle(el, prop, value);
+    });
+  }
+  for (const [name, value] of Object.entries(otherAttrs)) {
+    setAttribute(el, name, value);
+  }
+}
+function setClass(el, className) {
+  el.className = "";
+  if (typeof className === "string") {
+    el.className = className;
+  }
+  if (Array.isArray(className)) {
+    el.classList.add(...className);
+  }
+}
+function setStyle(el, name, value) {
+  el.style[name] = value;
+}
+function setAttribute(el, name, value) {
+  if (value == null) {
+    removeAttribute(el,name);
+  } else if (name.startsWith("data-")) {
+    el.setAttribute(name, value);
+  } else {
+    el[name] = value;
+  }
+}
+function removeAttribute(el,name){
+  el[name] = null;
+  el.removeAttribute(name);
+}
+
+function mountDOM(vdom, parentEl) {
+  switch (vdom.type) {
+    case DOM_TYPES.ELEMENT: {
+      createElementNode(vdom, parentEl);
+      break;
+    }
+    case DOM_TYPES.TEXT: {
+      createTextNode(vdom, parentEl);
+      break;
+    }
+    case DOM_TYPES.FRAGMENT: {
+      createFragmentNode(vdom, parentEl);
+      break;
+    }
+    default: {
+      throw new Error(`Can't mount DOM of type: ${vdom.type}`);
+    }
+  }
+}
+function createElementNode(vdom, parentEl) {
+  const elementNode = document.createElement(vdom.tag);
+  vdom.el = elementNode;
+  addProps(elementNode,vdom.props,vdom);
+  vdom.children.forEach((child)=>{
+    mountDOM(child, elementNode);
+  });
+  parentEl.append(elementNode);
+}
+function addProps(el,props,vdom){
+  const {on : events , ...attributes} = props;
+  vdom.listeners = addEventListeners(events,el);
+  setAttributes(el,attributes);
+}
+function createTextNode(vdom, parentEl) {
+  const textNode = document.createTextNode(vdom.value);
+  vdom.el = textNode ;
+  parentEl.append(textNode);
+}
+function createFragmentNode(vdom, parentEl) {
+  const fragmentNode = document.createDocumentFragment();
+  vdom.el = parentEl;
+  vdom.children.forEach((child) => {
+    mountDOM(child, fragmentNode);
+  });
+  parentEl.append(fragmentNode);
+}
+
 function createApp({ state, view, reducers = {} }) {
   let parentEl = null;
   let vdom = null;
@@ -236,11 +241,4 @@ function createApp({ state, view, reducers = {} }) {
   };
 }
 
-console.log("This will soon be a frontend framework!");
-createApp({
-  state: 0,
-  reducers: {
-    add: (state, amount) => state + amount,
-  },
-  view: (state, emit) => hElement("button", { on: { click: () => emit("add", 1) } }, [hText(state)]),
-}).mount(document.body);
+export { createApp, hElement, hFragment, hText };

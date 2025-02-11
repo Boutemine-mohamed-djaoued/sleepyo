@@ -48,7 +48,7 @@ function createTextNode(vdom, parentEl) {
 }
 
 function createFragmentNode(vdom, parentEl) {
-  const fragmentNode = document.createFragmentNode()
+  const fragmentNode = document.createDocumentFragment();
   vdom.el = parentEl
   vdom.children.forEach((child) => {
     mountDOM(child, fragmentNode);
