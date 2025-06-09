@@ -67,7 +67,7 @@ class ArrayWithOriginalIndices {
   }
 
   isNoop(index, newArray) {
-    if (index > this.length) return false;
+    if (index >= this.length) return false;
 
     const item = newArray[index];
     const oldItem = this.#array[index];
@@ -121,7 +121,7 @@ class ArrayWithOriginalIndices {
   }
 
   removeItemsAfter(index) {
-    const operations = {};
+    const operations = [];
     while (this.length > index) {
       operations.push(this.removeItem(index));
     }
@@ -137,7 +137,7 @@ export function arrayDiffSequence(
   const sequence = [];
   const array = new ArrayWithOriginalIndices(oldArray, equalFn);
 
-  for (let index = 0; index < array.length; index++) {
+  for (let index = 0; index < newArray.length; index++) {
     if (array.isRemoval(index, newArray)) {
       sequence.push(array.removeItem(index));
       index--;
@@ -159,3 +159,4 @@ export function arrayDiffSequence(
 
   return sequence;
 }
+

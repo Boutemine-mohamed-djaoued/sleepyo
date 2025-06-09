@@ -16,7 +16,9 @@ export function hElement(tag, props = {}, children = []) {
 }
 
 export function mapTextNodes(children) {
-  return children.map((child) => (typeof child === "string" ? hText(child) : child));
+  return children.map((child) =>
+    typeof child === "string" ? hText(child) : child
+  );
 }
 
 export function hText(value) {
@@ -31,4 +33,22 @@ export function hFragment(children = {}) {
     children: mapTextNodes(withoutNulls(children)),
     type: DOM_TYPES.FRAGMENT,
   };
+}
+
+export function extractChildren(vdom) {
+  if (vdom.children == null) {
+    return [];
+  }
+
+  const children = [];
+
+  for (const child of vdom.children) {
+    if (child.type === DOM_TYPES.FRAGMENT) {
+      children.push(...extractChildren(child));
+    } else {
+      children.push(child);
+    }
+  }
+
+  return children;
 }

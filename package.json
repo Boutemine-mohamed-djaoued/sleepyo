@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "serve:examples": "npx http-server . -o ./examples/"
+    "serve:examples": "npx http-server . -o ./examples/ -c-1"
   },
   "keywords": [],
   "author": "Sleep Well",

@@ -1,4 +1,4 @@
-export function objectsDiff(oldObj, newObj) {
+export function objectsDiff(oldObj = {}, newObj = {} ) {
   const oldKeys = Object.keys(oldObj);
   const newKeys = Object.keys(newObj);
 
