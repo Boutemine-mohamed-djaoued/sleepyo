@@ -2,10 +2,10 @@ import { DOM_TYPES } from "./h";
 import { setAttributes } from "./attributes";
 import { addEventListeners } from "./events";
 
-export function mountDOM(vdom, parentEl, index) {
+export function mountDOM(vdom, parentEl, index, hostComponent = null) {
   switch (vdom.type) {
     case DOM_TYPES.ELEMENT: {
-      createElementNode(vdom, parentEl, index);
+      createElementNode(vdom, parentEl, index, hostComponent);
       break;
     }
     case DOM_TYPES.TEXT: {
@@ -13,7 +13,7 @@ export function mountDOM(vdom, parentEl, index) {
       break;
     }
     case DOM_TYPES.FRAGMENT: {
-      createFragmentNode(vdom, parentEl, index);
+      createFragmentNode(vdom, parentEl, index, hostComponent);
       break;
     }
     default: {
@@ -31,6 +31,7 @@ export function insert(el, parentEl, index) {
   }
 
   const children = parentEl.childNodes;
+  console.log({index , children });
 
   if (index > children.length) {
     parentEl.append(el);
@@ -39,22 +40,22 @@ export function insert(el, parentEl, index) {
   }
 }
 
-function createElementNode(vdom, parentEl, index) {
+function createElementNode(vdom, parentEl, index, hostComponent) {
   const elementNode = document.createElement(vdom.tag);
   vdom.el = elementNode;
 
-  addProps(elementNode, vdom.props, vdom);
+  addProps(elementNode, vdom.props, vdom, hostComponent);
 
   vdom.children.forEach((child) => {
-    mountDOM(child, elementNode);
+    mountDOM(child, elementNode, null, hostComponent);
   });
 
   insert(elementNode, parentEl, index);
 }
 
-function addProps(el, props, vdom) {
+function addProps(el, props, vdom, hostComponent) {
   const { on: events, ...attributes } = props;
-  vdom.listeners = addEventListeners(events, el);
+  vdom.listeners = addEventListeners(events, el, hostComponent);
   setAttributes(el, attributes);
 }
 
@@ -64,11 +65,11 @@ function createTextNode(vdom, parentEl, index) {
   insert(textNode, parentEl, index);
 }
 
-function createFragmentNode(vdom, parentEl, index) {
+function createFragmentNode(vdom, parentEl, index, hostComponent) {
   const fragmentNode = document.createDocumentFragment();
   vdom.el = parentEl;
   vdom.children.forEach((child, i) => {
-    mountDOM(child, fragmentNode, index ? index + i : null);
+    mountDOM(child, fragmentNode, index ? index + i : null, hostComponent);
   });
   parentEl.append(fragmentNode);
 }

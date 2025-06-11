@@ -33,7 +33,6 @@ function removeElementNode(vdom) {
   }
 }
 
-
 function removeTextNode(vdom) {
   const { el } = vdom;
   el.remove();

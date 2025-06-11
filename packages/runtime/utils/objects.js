@@ -1,4 +1,4 @@
-export function objectsDiff(oldObj = {}, newObj = {} ) {
+export function objectsDiff(oldObj = {}, newObj = {}) {
   const oldKeys = Object.keys(oldObj);
   const newKeys = Object.keys(newObj);
 
@@ -9,4 +9,8 @@ export function objectsDiff(oldObj = {}, newObj = {} ) {
       (key) => oldKeys.includes(key) && oldObj[key] !== newObj[key]
     ),
   };
+}
+
+export function hasOwnPropery(obj, prop) {
+  return Object.prototype.hasOwnProperty.call(obj, prop);
 }

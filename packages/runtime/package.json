@@ -1,6 +1,6 @@
 {
   "name": "sleepyo",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "main": "dist/sleepyo.js",
   "files": [
     "dist/sleepyo.js"
@@ -13,7 +13,7 @@
     "lint:fix": "eslint src --fix",
     "test": "vitest",
     "test:run": "vitest run",
-    "dev":"node dist/sleepyo.js"
+    "dev": "node dist/sleepyo.js"
   },
   "keywords": [],
   "author": "",

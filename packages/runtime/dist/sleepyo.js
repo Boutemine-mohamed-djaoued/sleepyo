@@ -175,17 +175,22 @@ function extractChildren(vdom) {
   return children;
 }
 
-function addEventListeners(listeners = {},el){
+function addEventListeners(listeners = {}, el, hostComponent = null) {
   const addedListeneres = {};
-  Object.entries(listeners).forEach(([eventName,handler])=>{
-    const listener = addEventListener(eventName,handler,el);
+  Object.entries(listeners).forEach(([eventName, handler]) => {
+    const listener = addEventListener(eventName, handler, el, hostComponent);
     addedListeneres[eventName] = listener;
   });
-  return addedListeneres
+  return addedListeneres;
 }
-function addEventListener(eventName, handler, el) {
-  el.addEventListener(eventName, handler);
-  return handler;
+function addEventListener(eventName, handler, el, hostComponent = null) {
+  function boundHandler() {
+    hostComponent
+      ? handler.apply(hostComponent, arguments)
+      : handler(...arguments);
+  }
+  el.addEventListener(eventName, boundHandler);
+  return boundHandler;
 }
 function removeEventListeners(listeners, el) {
   Object.entries(listeners).forEach(([eventName, handler]) => {
@@ -308,10 +313,10 @@ function removeAttribute(el,name){
   el.removeAttribute(name);
 }
 
-function mountDOM(vdom, parentEl, index) {
+function mountDOM(vdom, parentEl, index, hostComponent = null) {
   switch (vdom.type) {
     case DOM_TYPES.ELEMENT: {
-      createElementNode(vdom, parentEl, index);
+      createElementNode(vdom, parentEl, index, hostComponent);
       break;
     }
     case DOM_TYPES.TEXT: {
@@ -319,7 +324,7 @@ function mountDOM(vdom, parentEl, index) {
       break;
     }
     case DOM_TYPES.FRAGMENT: {
-      createFragmentNode(vdom, parentEl, index);
+      createFragmentNode(vdom, parentEl, index, hostComponent);
       break;
     }
     default: {
@@ -335,24 +340,25 @@ function insert(el, parentEl, index) {
     throw new Error(`index must be a positive integer ,got ${index}`);
   }
   const children = parentEl.childNodes;
+  console.log({index , children });
   if (index > children.length) {
     parentEl.append(el);
   } else {
     parentEl.insertBefore(el, children[index]);
   }
 }
-function createElementNode(vdom, parentEl, index) {
+function createElementNode(vdom, parentEl, index, hostComponent) {
   const elementNode = document.createElement(vdom.tag);
   vdom.el = elementNode;
-  addProps(elementNode, vdom.props, vdom);
+  addProps(elementNode, vdom.props, vdom, hostComponent);
   vdom.children.forEach((child) => {
-    mountDOM(child, elementNode);
+    mountDOM(child, elementNode, null, hostComponent);
   });
   insert(elementNode, parentEl, index);
 }
-function addProps(el, props, vdom) {
+function addProps(el, props, vdom, hostComponent) {
   const { on: events, ...attributes } = props;
-  vdom.listeners = addEventListeners(events, el);
+  vdom.listeners = addEventListeners(events, el, hostComponent);
   setAttributes(el, attributes);
 }
 function createTextNode(vdom, parentEl, index) {
@@ -360,16 +366,16 @@ function createTextNode(vdom, parentEl, index) {
   vdom.el = textNode;
   insert(textNode, parentEl, index);
 }
-function createFragmentNode(vdom, parentEl, index) {
+function createFragmentNode(vdom, parentEl, index, hostComponent) {
   const fragmentNode = document.createDocumentFragment();
   vdom.el = parentEl;
   vdom.children.forEach((child, i) => {
-    mountDOM(child, fragmentNode, index ? index + i : null);
+    mountDOM(child, fragmentNode, index ? index + i : null, hostComponent);
   });
   parentEl.append(fragmentNode);
 }
 
-function objectsDiff(oldObj = {}, newObj = {} ) {
+function objectsDiff(oldObj = {}, newObj = {}) {
   const oldKeys = Object.keys(oldObj);
   const newKeys = Object.keys(newObj);
   return {
@@ -379,6 +385,9 @@ function objectsDiff(oldObj = {}, newObj = {} ) {
       (key) => oldKeys.includes(key) && oldObj[key] !== newObj[key]
     ),
   };
+}
+function hasOwnPropery(obj, prop) {
+  return Object.prototype.hasOwnProperty.call(obj, prop);
 }
 
 function isNotEmptyString(str) {
@@ -396,11 +405,11 @@ function areNodesEqual(nodeOne, nodeTwo) {
   return true;
 }
 
-function patchDom(oldVdom, newVdom, parentEl) {
+function patchDom(oldVdom, newVdom, parentEl, hostComponent = null) {
   if (!areNodesEqual(oldVdom, newVdom)) {
     const index = findIndexInParent(parentEl, oldVdom.el);
     destroyDom(oldVdom);
-    mountDOM(newVdom, parentEl, index);
+    mountDOM(newVdom, parentEl, index, hostComponent);
     return newVdom;
   }
   newVdom.el = oldVdom.el;
@@ -410,11 +419,11 @@ function patchDom(oldVdom, newVdom, parentEl) {
       return newVdom;
     }
     case DOM_TYPES.ELEMENT: {
-      patchElement(oldVdom, newVdom);
+      patchElement(oldVdom, newVdom, hostComponent);
       break;
     }
   }
-  patchChildren(oldVdom, newVdom);
+  patchChildren(oldVdom, newVdom, hostComponent);
   return newVdom;
 }
 function findIndexInParent(parentEl, el) {
@@ -428,7 +437,7 @@ function patchText(oldVdom, newVdom) {
     el.nodeValue = newVdom.value;
   }
 }
-function patchElement(oldVdom, newVdom) {
+function patchElement(oldVdom, newVdom , hostComponent) {
   const el = oldVdom.el;
   const {
     class: oldClass,
@@ -446,9 +455,9 @@ function patchElement(oldVdom, newVdom) {
   patchAttrs(el, oldAttrs, newAttrs);
   patchClasses(el, oldClass, newClass);
   patchStyle(el, oldStyle, newStyle);
-  newVdom.listeners = patchEvents(el, oldListeners, oldEvents, newEvents);
+  newVdom.listeners = patchEvents(el, oldListeners, oldEvents, newEvents,hostComponent);
 }
-function patchAttrs(el, oldAttrs, newAttrs ) {
+function patchAttrs(el, oldAttrs, newAttrs) {
   const { added, removed, updated } = objectsDiff(oldAttrs, newAttrs);
   for (const attr of removed) {
     removeAttribute(el, attr);
@@ -482,28 +491,30 @@ function patchStyle(el, oldStyle = {}, newStyle = {}) {
     setStyle(el, style, newStyle[style]);
   }
 }
-function patchEvents(el, oldListners = {}, oldEvents = {}, newEvents = {}) {
+function patchEvents(el, oldListners = {}, oldEvents = {}, newEvents = {} , hostComponent) {
   const { added, removed, updated } = objectsDiff(oldEvents, newEvents);
   for (const eventName of removed.concat(updated)) {
     el.removeEventListener(eventName, oldListners[eventName]);
   }
   const addedListeners = {};
   for (const eventName of added.concat(updated)) {
-    const listener = addEventListener(eventName, newEvents[eventName], el);
+    const listener = addEventListener(eventName, newEvents[eventName], el , hostComponent);
     addedListeners[eventName] = listener;
   }
   return addedListeners;
 }
-function patchChildren(oldVdom, newVdom) {
+function patchChildren(oldVdom, newVdom, hostComponent) {
   const oldChildren = extractChildren(oldVdom);
   const newChildren = extractChildren(newVdom);
   const parentEl = oldVdom.el;
   const diffSeq = arrayDiffSequence(oldChildren, newChildren, areNodesEqual);
   for (const operation of diffSeq) {
     const { originalIndex, index, item } = operation;
+    const offset = hostComponent?.offset ?? 0;
+    console.log(offset);
     switch (operation.op) {
       case ARRAY_DIFF_OP.ADD: {
-        mountDOM(item, parentEl, index);
+        mountDOM(item, parentEl, index + offset, hostComponent);
         break;
       }
       case ARRAY_DIFF_OP.REMOVE: {
@@ -514,20 +525,94 @@ function patchChildren(oldVdom, newVdom) {
         const oldChild = oldChildren[originalIndex];
         const newChild = newChildren[index];
         const el = oldChild.el;
-        const elAtTargetElement = parentEl.childNodes[index];
+        const elAtTargetElement = parentEl.childNodes[index + offset];
         parentEl.insertBefore(el, elAtTargetElement);
-        patchDom(oldChild, newChild, parentEl);
+        patchDom(oldChild, newChild, parentEl, hostComponent);
         break;
       }
       case ARRAY_DIFF_OP.NOOP: {
-        patchDom(oldChildren[originalIndex], newChildren[index], parentEl);
+        patchDom(
+          oldChildren[originalIndex],
+          newChildren[index],
+          parentEl,
+          hostComponent
+        );
         break;
       }
     }
   }
 }
 
+function defineComponent({ render, state, ...methods }) {
+  class Component {
+    #vdom = null;
+    #hostEl = null;
+    #isMounted = false;
+    render() {
+      return render.call(this);
+    }
+    constructor(props = {}) {
+      this.props = props;
+      this.state = state ? state(props) : {};
+    }
+    get elements() {
+      if (this.#vdom == null) {
+        return [];
+      }
+      if (this.#vdom.type === DOM_TYPES.FRAGMENT) {
+        return extractChildren(this.#vdom).map((child) => child.el);
+      }
+      return [this.#vdom.el];
+    }
+    get firstElement() {
+      return this.elements[0];
+    }
+    get offset() {
+      if (this.#vdom.type === DOM_TYPES.FRAGMENT)
+        return Array.from(this.#hostEl.children).indexOf(this.firstElement);
+      return 0;
+    }
+    updateState(state) {
+      this.state = { ...this.state, ...state };
+      this.#patch();
+    }
+    mount(hostEl, index = null) {
+      if (this.#isMounted) {
+        throw new Error("Component is already mounted");
+      }
+      this.#vdom = this.render();
+      mountDOM(this.#vdom, hostEl, index, this);
+      this.#hostEl = hostEl;
+      this.#isMounted = true;
+    }
+    #patch() {
+      if (!this.#isMounted) {
+        throw new Error("Component is not mounted");
+      }
+      const newVdom = this.render();
+      this.#vdom = patchDom(this.#vdom, newVdom, this.#hostEl, this);
+    }
+    unmount() {
+      if (!this.#isMounted) {
+        throw new Error("Component is not mounted");
+      }
+      destroyDom(this.#vdom);
+      this.#vdom = null;
+      this.#hostEl = null;
+      this.#isMounted = false;
+    }
+  }
+  for (const methodName in methods) {
+    if (hasOwnPropery(Component, methodName)) {
+      throw new Error(`method ${methodName} already exists in component.`);
+    }
+    Component.prototype[methodName] = methods[methodName];
+  }
+  return Component;
+}
+
 function createApp({ state, view, reducers = {} }) {
+  console.log(defineComponent({ render: null }));
   let parentEl = null;
   let vdom = null;
   let isMounted = false;
@@ -549,7 +634,7 @@ function createApp({ state, view, reducers = {} }) {
   }
   return {
     mount(_parentEl) {
-      if(isMounted) {
+      if (isMounted) {
         throw new Error("App is already mounted");
       }
       parentEl = _parentEl;
@@ -566,4 +651,4 @@ function createApp({ state, view, reducers = {} }) {
   };
 }
 
-export { createApp, hElement, hFragment, hText };
+export { createApp, defineComponent, hElement, hFragment, hText };

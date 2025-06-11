@@ -2,12 +2,12 @@ import { destroyDom } from "./destroy-dom";
 import { Dispatcher } from "./dispatcher";
 import { mountDOM } from "./mount-dom";
 import { patchDom } from "./patch-dom";
-
+import { defineComponent } from "./component";
 export function createApp({ state, view, reducers = {} }) {
+  console.log(defineComponent({ render: null }));
   let parentEl = null;
   let vdom = null;
-  let isMounted = false
-
+  let isMounted = false;
 
   const dispatcher = new Dispatcher();
   const subscriptions = [dispatcher.afterEveryCommand(renderApp)];
@@ -31,7 +31,7 @@ export function createApp({ state, view, reducers = {} }) {
 
   return {
     mount(_parentEl) {
-      if(isMounted) {
+      if (isMounted) {
         throw new Error("App is already mounted");
       }
       parentEl = _parentEl;

@@ -1,0 +1,78 @@
+<html>
+  <head>
+    <script type="module">
+      import {
+        createApp,
+        hElement,
+        hText,
+        hFragment,
+        defineComponent,
+      } from "../../packages/runtime/dist/sleepyo.js";
+
+      async function loadCocktail() {
+        this.updateState({ loading: true });
+        const response = await fetch(
+          "https://www.thecocktaildb.com/api/json/v1/1/random.php"
+        );
+        const {
+          drinks: [drink],
+        } = await response.json();
+        console.log(drink);
+        this.updateState({
+          loading: false,
+          name: drink.strDrink,
+          instructions: drink.strInstructions,
+          img: drink.strDrinkThumb,
+        });
+      }
+
+      function state() {
+        return {
+          loading: false,
+          name: "",
+          instructions: "",
+          img: "",
+        };
+      }
+
+      function render() {
+        return hElement("div", {}, [
+          hElement("div", {}, ["padding"]),
+          hFragment([
+            hElement("h1", {}, [
+              hText(
+                this.state.name !== "" ? this.state.name : `Random cocktail`
+              ),
+            ]),
+            this.state.loading ? hElement("p", {}, ["loading..."]) : null,
+            this.state.name !== ""
+              ? hElement("p", {}, [this.state.instructions])
+              : null,
+            this.state.name !== ""
+              ? hElement("img", { src: this.state.img }, [])
+              : null,
+            hElement(
+              "button",
+              {
+                on: {
+                  click: () => this.loadCocktail(),
+                },
+              },
+              ["Get a cocktail"]
+            ),
+          ]),
+        ]);
+      }
+
+      const myClass = defineComponent({ render, state, loadCocktail });
+      const drinks = new myClass();
+
+      drinks.mount(document.querySelector("body"));
+      // setTimeout(() => myCounter.unmount(), 2000);
+    </script>
+
+    <title>Counter</title>
+  </head>
+
+  <body></body>
+</html>
