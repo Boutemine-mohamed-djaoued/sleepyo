@@ -325,6 +325,7 @@ function removeAttribute(el,name){
 
 function extractPropsAndEvents(vdom) {
   const { on: events, ...props } = vdom.props;
+  delete props.key;
   return { events, props };
 }
 
@@ -368,14 +369,14 @@ function insert(el, parentEl, index) {
 function createElementNode(vdom, parentEl, index, hostComponent) {
   const elementNode = document.createElement(vdom.tag);
   vdom.el = elementNode;
-  addProps(elementNode, vdom.props, vdom, hostComponent);
+  addProps(elementNode, vdom, hostComponent);
   vdom.children.forEach((child) => {
     mountDOM(child, elementNode, null, hostComponent);
   });
   insert(elementNode, parentEl, index);
 }
-function addProps(el, props, vdom, hostComponent) {
-  const { on: events, ...attributes } = props;
+function addProps(el, vdom, hostComponent) {
+  const { events, props : attributes } = extractPropsAndEvents(vdom);
   vdom.listeners = addEventListeners(events, el, hostComponent);
   setAttributes(el, attributes);
 }
@@ -425,8 +426,11 @@ function isNotBlankOrEmptyString(str) {
 
 function areNodesEqual(nodeOne, nodeTwo) {
   if (nodeOne.type !== nodeTwo.type) return false;
-  if (nodeOne.type === DOM_TYPES.ELEMENT) {
-    return nodeOne.tag === nodeTwo.tag;
+  if (
+    nodeOne.type === DOM_TYPES.ELEMENT ||
+    nodeOne.type === DOM_TYPES.COMPONENT
+  ) {
+    return nodeOne.tag === nodeTwo.tag && nodeOne.key === nodeTwo.key;
   }
   return true;
 }
@@ -596,41 +600,31 @@ function patchComponent(oldVdom, newVdom) {
   newVdom.el = component.firstElement;
 }
 
-function createApp({ state, view, reducers = {} }) {
+function createApp({ rootComponent, props = {} }) {
   let parentEl = null;
-  let vdom = null;
   let isMounted = false;
-  const dispatcher = new Dispatcher();
-  const subscriptions = [dispatcher.afterEveryCommand(renderApp)];
-  function emit(eventName, payload) {
-    dispatcher.dispatch(eventName, payload);
-  }
-  for (const actionName in reducers) {
-    const reducer = reducers[actionName];
-    const sub = dispatcher.subscribe(actionName, (payload) => {
-      state = reducer(state, payload);
-    });
-    subscriptions.push(sub);
-  }
-  function renderApp() {
-    const newVdom = view(state, emit);
-    vdom = patchDom(vdom, newVdom, parentEl);
+  let vdom = null;
+  function reset() {
+    parentEl = null;
+    isMounted = false;
+    vdom = null;
   }
   return {
     mount(_parentEl) {
       if (isMounted) {
-        throw new Error("App is already mounted");
+        throw new Error("The application is already mounted");
       }
       parentEl = _parentEl;
-      vdom = view(state, emit);
+      vdom = hElement(rootComponent, props);
       mountDOM(vdom, parentEl);
       isMounted = true;
     },
     unmount() {
+      if (!isMounted) {
+        throw new Error("The application is not mounted");
+      }
       destroyDom(vdom);
-      vdom = null;
-      subscriptions.forEach((unsubscribe) => unsubscribe());
-      isMounted = false;
+      reset();
     },
   };
 }

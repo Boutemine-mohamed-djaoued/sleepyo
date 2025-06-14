@@ -9,44 +9,31 @@
         defineComponent,
       } from "../../packages/runtime/dist/sleepyo.js";
 
-      const SuperButton = defineComponent({
+      const rootComponent = defineComponent({
         state() {
-          return { value: "hello there" };
+          return { counter: 0 };
         },
         render() {
-          return hElement(
-            "button",
-            {
-              on: {
-                click: () => this.emit("myClick"),
+          const { counter } = this.state;
+          return hElement("div", {}, [
+            hElement("p", {}, ["welcome to my counter",` ${counter}`]),
+            hElement("br", {}, []),
+            hElement(
+              "button",
+              {
+                on: {
+                  click: () => this.updateState({ counter: counter + 1 }),
+                },
               },
-            },
-            ["click", ` ${this.props.value}`]
-          );
+              ["add"]
+            ),
+          ]);
         },
       });
 
-      const SuperSuperButton = defineComponent({
-        state() {
-          return { value: 1 };
-        },
-        render() {
-          return hElement(
-            SuperButton,
-            {
-              on: {
-                myClick: () => this.updateState({ value: this.state.value + 1}),
-              },
-              value: this.state.value,
-            },
-            []
-          );
-        },
-      });
+      const app = createApp({ rootComponent });
+      app.mount(document.querySelector("body"));
 
-      const superSuperButton = new SuperSuperButton();
-
-      superSuperButton.mount(document.querySelector("body"));
     </script>
 
     <title>Counter</title>
