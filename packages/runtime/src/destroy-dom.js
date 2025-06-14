@@ -15,6 +15,10 @@ export function destroyDom(vdom) {
       removeFragmentNode(vdom);
       break;
     }
+    case DOM_TYPES.COMPONENT: {
+      removeComponentNode(vdom);
+      break;
+    }
     default: {
       throw new Error("Can't destroy DOM of type: ${type}");
     }
@@ -41,4 +45,8 @@ function removeTextNode(vdom) {
 function removeFragmentNode(vdom) {
   const { children } = vdom;
   children.forEach(destroyDom);
+}
+
+function removeComponentNode(vdom) {
+  vdom.component.unmount();
 }

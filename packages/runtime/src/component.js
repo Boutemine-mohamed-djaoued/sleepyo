@@ -3,28 +3,41 @@ import { destroyDom } from "./destroy-dom";
 import { patchDom } from "./patch-dom";
 import { DOM_TYPES, extractChildren } from "./h";
 import { hasOwnPropery } from "../utils/objects";
+import { Dispatcher } from "./dispatcher";
+import equal from "fast-deep-equal";
 
 export function defineComponent({ render, state, ...methods }) {
   class Component {
     #vdom = null;
     #hostEl = null;
     #isMounted = false;
-
+    #eventHandlers = null;
+    #parentComponent = null;
+    #dispatcher = new Dispatcher();
+    #subscriptions = [];
     render() {
       return render.call(this);
     }
 
-    constructor(props = {}) {
+    constructor(props = {}, eventHandlers = {}, parentComponent = null) {
       this.props = props;
       this.state = state ? state(props) : {};
+      this.#eventHandlers = eventHandlers;
+      this.#parentComponent = parentComponent;
     }
 
     get elements() {
       if (this.#vdom == null) {
         return [];
       }
+
       if (this.#vdom.type === DOM_TYPES.FRAGMENT) {
-        return extractChildren(this.#vdom).map((child) => child.el);
+        return extractChildren(this.#vdom).flatMap((child) => {
+          if (child.type === DOM_TYPES.COMPONENT) {
+            return child.component.elements;
+          }
+          return [child.el];
+        });
       }
 
       return [this.#vdom.el];
@@ -45,12 +58,24 @@ export function defineComponent({ render, state, ...methods }) {
       this.#patch();
     }
 
+    updateProps(props) {
+      const newProps = { ...this.props, ...props };
+
+      if (equal(this.props, newProps)) {
+        return;
+      }
+
+      this.props = newProps;
+      this.#patch();
+    }
+
     mount(hostEl, index = null) {
       if (this.#isMounted) {
         throw new Error("Component is already mounted");
       }
       this.#vdom = this.render();
       mountDOM(this.#vdom, hostEl, index, this);
+      this.#wireEventHandlers();
       this.#hostEl = hostEl;
       this.#isMounted = true;
     }
@@ -68,9 +93,33 @@ export function defineComponent({ render, state, ...methods }) {
         throw new Error("Component is not mounted");
       }
       destroyDom(this.#vdom);
+      this.#subscriptions.forEach((unsubscribe) => unsubscribe());
       this.#vdom = null;
       this.#hostEl = null;
       this.#isMounted = false;
+      this.#subscriptions = [];
+    }
+
+    #wireEventHandler(eventName, handler) {
+      return this.#dispatcher.subscribe(eventName, (payload) => {
+        if (this.#parentComponent) {
+          handler.call(this.#parentComponent, payload);
+        } else {
+          handler(payload);
+        }
+      });
+    }
+
+    #wireEventHandlers() {
+      this.#subscriptions = Object.entries(this.#eventHandlers).map(
+        ([eventName, handler]) => {
+          return this.#wireEventHandler(eventName, handler);
+        }
+      );
+    }
+
+    emit(eventName, payload) {
+      this.#dispatcher.dispatch(eventName, payload);
     }
   }
   for (const methodName in methods) {

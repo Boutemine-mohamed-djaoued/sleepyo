@@ -1,5 +1,6 @@
 import { ARRAY_DIFF_OP, arrayDiffSequence, arraysDiff } from "../utils/arrays";
 import { objectsDiff } from "../utils/objects";
+import { extractPropsAndEvents } from "../utils/props";
 import { isNotBlankOrEmptyString } from "../utils/strings";
 import {
   removeAttribute,
@@ -21,6 +22,7 @@ export function patchDom(oldVdom, newVdom, parentEl, hostComponent = null) {
     return newVdom;
   }
 
+
   newVdom.el = oldVdom.el;
 
   switch (newVdom.type) {
@@ -30,6 +32,10 @@ export function patchDom(oldVdom, newVdom, parentEl, hostComponent = null) {
     }
     case DOM_TYPES.ELEMENT: {
       patchElement(oldVdom, newVdom, hostComponent);
+      break;
+    }
+    case DOM_TYPES.COMPONENT: {
+      patchComponent(oldVdom, newVdom);
       break;
     }
   }
@@ -54,7 +60,7 @@ function patchText(oldVdom, newVdom) {
   }
 }
 
-function patchElement(oldVdom, newVdom , hostComponent) {
+function patchElement(oldVdom, newVdom, hostComponent) {
   const el = oldVdom.el;
   const {
     class: oldClass,
@@ -76,7 +82,13 @@ function patchElement(oldVdom, newVdom , hostComponent) {
   patchClasses(el, oldClass, newClass);
   patchStyle(el, oldStyle, newStyle);
 
-  newVdom.listeners = patchEvents(el, oldListeners, oldEvents, newEvents,hostComponent);
+  newVdom.listeners = patchEvents(
+    el,
+    oldListeners,
+    oldEvents,
+    newEvents,
+    hostComponent
+  );
 }
 
 function patchAttrs(el, oldAttrs, newAttrs) {
@@ -124,7 +136,13 @@ function patchStyle(el, oldStyle = {}, newStyle = {}) {
   }
 }
 
-function patchEvents(el, oldListners = {}, oldEvents = {}, newEvents = {} , hostComponent) {
+function patchEvents(
+  el,
+  oldListners = {},
+  oldEvents = {},
+  newEvents = {},
+  hostComponent
+) {
   const { added, removed, updated } = objectsDiff(oldEvents, newEvents);
 
   for (const eventName of removed.concat(updated)) {
@@ -134,7 +152,12 @@ function patchEvents(el, oldListners = {}, oldEvents = {}, newEvents = {} , host
   const addedListeners = {};
 
   for (const eventName of added.concat(updated)) {
-    const listener = addEventListener(eventName, newEvents[eventName], el , hostComponent);
+    const listener = addEventListener(
+      eventName,
+      newEvents[eventName],
+      el,
+      hostComponent
+    );
     addedListeners[eventName] = listener;
   }
 
@@ -152,7 +175,6 @@ function patchChildren(oldVdom, newVdom, hostComponent) {
   for (const operation of diffSeq) {
     const { originalIndex, index, item } = operation;
     const offset = hostComponent?.offset ?? 0;
-    console.log(offset);
     switch (operation.op) {
       case ARRAY_DIFF_OP.ADD: {
         mountDOM(item, parentEl, index + offset, hostComponent);
@@ -182,4 +204,14 @@ function patchChildren(oldVdom, newVdom, hostComponent) {
       }
     }
   }
+}
+
+function patchComponent(oldVdom, newVdom) {
+  const { component } = oldVdom;
+  const { props } = extractPropsAndEvents(newVdom);
+
+  component.updateProps(props);
+
+  newVdom.component = component;
+  newVdom.el = component.firstElement;
 }
