@@ -2,6 +2,7 @@ import { DOM_TYPES } from "./h";
 import { setAttributes } from "./attributes";
 import { addEventListeners } from "./events";
 import { extractPropsAndEvents } from "../utils/props";
+import { enqueueJob } from "./scheduler";
 
 export function mountDOM(vdom, parentEl, index, hostComponent = null) {
   switch (vdom.type) {
@@ -19,6 +20,7 @@ export function mountDOM(vdom, parentEl, index, hostComponent = null) {
     }
     case DOM_TYPES.COMPONENT: {
       createComponentNode(vdom, parentEl, index, hostComponent);
+      enqueueJob(() => vdom.component.onMounted());
       break;
     }
     default: {
@@ -58,7 +60,7 @@ function createElementNode(vdom, parentEl, index, hostComponent) {
 }
 
 function addProps(el, vdom, hostComponent) {
-  const { events, props : attributes } = extractPropsAndEvents(vdom);
+  const { events, props: attributes } = extractPropsAndEvents(vdom);
 
   vdom.listeners = addEventListeners(events, el, hostComponent);
   setAttributes(el, attributes);

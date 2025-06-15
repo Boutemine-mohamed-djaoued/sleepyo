@@ -9,31 +9,35 @@
         defineComponent,
       } from "../../packages/runtime/dist/sleepyo.js";
 
-      const rootComponent = defineComponent({
-        state() {
-          return { counter: 0 };
+      const NameComponent = defineComponent({
+        onMounted() {
+          console.log(`Component mounted with name: ${this.props.name}`);
+        },
+        onUnmounted() {
+          console.log(`Component unmounted with name: ${this.props.name}`);
         },
         render() {
-          const { counter } = this.state;
-          return hElement("div", {}, [
-            hElement("p", {}, ["welcome to my counter",` ${counter}`]),
-            hElement("br", {}, []),
-            hElement(
-              "button",
-              {
-                on: {
-                  click: () => this.updateState({ counter: counter + 1 }),
-                },
-              },
-              ["add"]
-            ),
+          return hElement("p", {}, [this.props.name]);
+        },
+      });
+
+      const rootComponent = defineComponent({
+        render() {
+          return hFragment([
+            hElement(NameComponent, { name: "Alice" }),
+            hElement(NameComponent, { name: "Bob" }),
+            hElement(NameComponent, { name: "Charlie" }),
+            hElement(NameComponent, { name: "Diana" }),
+            hElement(NameComponent, { name: "Eve" }),
           ]);
         },
       });
 
       const app = createApp({ rootComponent });
       app.mount(document.querySelector("body"));
-
+      setTimeout(() => {
+        app.unmount();
+      }, 2000);
     </script>
 
     <title>Counter</title>

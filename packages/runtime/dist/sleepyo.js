@@ -201,6 +201,31 @@ function removeEventListeners(listeners, el) {
   });
 }
 
+let isScheduled = false;
+const jobs = [];
+function enqueueJob(job) {
+  jobs.push(job);
+  scheduleUpdate();
+}
+function scheduleUpdate() {
+  if (isScheduled) return;
+  isScheduled = true;
+  queueMicrotask(processJobs);
+}
+function processJobs() {
+  while (jobs.length > 0) {
+    const job = jobs.shift();
+    const result = job();
+    Promise.resolve(result).then(
+      () => {},
+      (err) => {
+        console.error(`scheduler ${err}`);
+      }
+    );
+  }
+  isScheduled = false;
+}
+
 function destroyDom(vdom) {
   switch (vdom.type) {
     case DOM_TYPES.ELEMENT: {
@@ -217,6 +242,7 @@ function destroyDom(vdom) {
     }
     case DOM_TYPES.COMPONENT: {
       removeComponentNode(vdom);
+      enqueueJob(() => vdom.component.onUnmounted());
       break;
     }
     default: {
@@ -244,40 +270,6 @@ function removeFragmentNode(vdom) {
 }
 function removeComponentNode(vdom) {
   vdom.component.unmount();
-}
-
-class Dispatcher {
-  #subs = new Map();
-  #afterHandlers = [];
-  subscribe(commandName, handler) {
-    if (!this.#subs.has(commandName)) {
-      this.#subs.set(commandName, []);
-    }
-    const handlers = this.#subs.get(commandName);
-    if (handlers.includes(handler)) {
-      return () => {};
-    }
-    handlers.push(handler);
-    return () => {
-      const idx = handlers.indexOf(handler);
-      handlers.splice(idx, 1);
-    };
-  }
-  afterEveryCommand(handler) {
-    this.#afterHandlers.push(handler);
-    return () => {
-      const idx = this.#afterHandlers.indexOf(handler);
-      this.#afterHandlers.splice(idx, 1);
-    };
-  }
-  dispatch(commandName, payload) {
-    if (this.#subs.has(commandName)) {
-      this.#subs.get(commandName).forEach((handler) => handler(payload));
-    } else {
-      console.warn(`No handlers for command: ${commandName}`);
-    }
-    this.#afterHandlers.forEach((handler) => handler());
-  }
 }
 
 function setAttributes(el, attrs) {
@@ -345,6 +337,7 @@ function mountDOM(vdom, parentEl, index, hostComponent = null) {
     }
     case DOM_TYPES.COMPONENT: {
       createComponentNode(vdom, parentEl, index, hostComponent);
+      enqueueJob(() => vdom.component.onMounted());
       break;
     }
     default: {
@@ -376,7 +369,7 @@ function createElementNode(vdom, parentEl, index, hostComponent) {
   insert(elementNode, parentEl, index);
 }
 function addProps(el, vdom, hostComponent) {
-  const { events, props : attributes } = extractPropsAndEvents(vdom);
+  const { events, props: attributes } = extractPropsAndEvents(vdom);
   vdom.listeners = addEventListeners(events, el, hostComponent);
   setAttributes(el, attributes);
 }
@@ -400,6 +393,35 @@ function createFragmentNode(vdom, parentEl, index, hostComponent) {
     mountDOM(child, fragmentNode, index ? index + i : null, hostComponent);
   });
   parentEl.append(fragmentNode);
+}
+
+function createApp({ rootComponent, props = {} }) {
+  let parentEl = null;
+  let isMounted = false;
+  let vdom = null;
+  function reset() {
+    parentEl = null;
+    isMounted = false;
+    vdom = null;
+  }
+  return {
+    mount(_parentEl) {
+      if (isMounted) {
+        throw new Error("The application is already mounted");
+      }
+      parentEl = _parentEl;
+      vdom = hElement(rootComponent, props);
+      mountDOM(vdom, parentEl);
+      isMounted = true;
+    },
+    unmount() {
+      if (!isMounted) {
+        throw new Error("The application is not mounted");
+      }
+      destroyDom(vdom);
+      reset();
+    },
+  };
 }
 
 function objectsDiff(oldObj = {}, newObj = {}) {
@@ -600,33 +622,38 @@ function patchComponent(oldVdom, newVdom) {
   newVdom.el = component.firstElement;
 }
 
-function createApp({ rootComponent, props = {} }) {
-  let parentEl = null;
-  let isMounted = false;
-  let vdom = null;
-  function reset() {
-    parentEl = null;
-    isMounted = false;
-    vdom = null;
+class Dispatcher {
+  #subs = new Map();
+  #afterHandlers = [];
+  subscribe(commandName, handler) {
+    if (!this.#subs.has(commandName)) {
+      this.#subs.set(commandName, []);
+    }
+    const handlers = this.#subs.get(commandName);
+    if (handlers.includes(handler)) {
+      return () => {};
+    }
+    handlers.push(handler);
+    return () => {
+      const idx = handlers.indexOf(handler);
+      handlers.splice(idx, 1);
+    };
   }
-  return {
-    mount(_parentEl) {
-      if (isMounted) {
-        throw new Error("The application is already mounted");
-      }
-      parentEl = _parentEl;
-      vdom = hElement(rootComponent, props);
-      mountDOM(vdom, parentEl);
-      isMounted = true;
-    },
-    unmount() {
-      if (!isMounted) {
-        throw new Error("The application is not mounted");
-      }
-      destroyDom(vdom);
-      reset();
-    },
-  };
+  afterEveryCommand(handler) {
+    this.#afterHandlers.push(handler);
+    return () => {
+      const idx = this.#afterHandlers.indexOf(handler);
+      this.#afterHandlers.splice(idx, 1);
+    };
+  }
+  dispatch(commandName, payload) {
+    if (this.#subs.has(commandName)) {
+      this.#subs.get(commandName).forEach((handler) => handler(payload));
+    } else {
+      console.warn(`No handlers for command: ${commandName}`);
+    }
+    this.#afterHandlers.forEach((handler) => handler());
+  }
 }
 
 function getDefaultExportFromCjs (x) {
@@ -672,7 +699,14 @@ function requireFastDeepEqual () {
 var fastDeepEqualExports = requireFastDeepEqual();
 var equal = /*@__PURE__*/getDefaultExportFromCjs(fastDeepEqualExports);
 
-function defineComponent({ render, state, ...methods }) {
+const emptyFn = () => {};
+function defineComponent({
+  render,
+  state,
+  onMounted = emptyFn,
+  onUnmounted = emptyFn,
+  ...methods
+}) {
   class Component {
     #vdom = null;
     #hostEl = null;
@@ -770,6 +804,12 @@ function defineComponent({ render, state, ...methods }) {
     }
     emit(eventName, payload) {
       this.#dispatcher.dispatch(eventName, payload);
+    }
+    onMounted() {
+      return Promise.resolve(onMounted.call(this));
+    }
+    onUnmounted() {
+      return Promise.resolve(onUnmounted.call(this));
     }
   }
   for (const methodName in methods) {

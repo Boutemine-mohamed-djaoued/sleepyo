@@ -22,7 +22,6 @@ export function patchDom(oldVdom, newVdom, parentEl, hostComponent = null) {
     return newVdom;
   }
 
-
   newVdom.el = oldVdom.el;
 
   switch (newVdom.type) {
