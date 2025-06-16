@@ -208,7 +208,9 @@ function patchChildren(oldVdom, newVdom, hostComponent) {
 function patchComponent(oldVdom, newVdom) {
   const { component } = oldVdom;
   const { props } = extractPropsAndEvents(newVdom);
+  const { children } = newVdom;
 
+  component.setExternalContent(children);
   component.updateProps(props);
 
   newVdom.component = component;

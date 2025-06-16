@@ -1,9 +1,15 @@
 import { mountDOM } from "./mount-dom";
 import { destroyDom } from "./destroy-dom";
 import { patchDom } from "./patch-dom";
-import { DOM_TYPES, extractChildren } from "./h";
+import {
+  DOM_TYPES,
+  extractChildren,
+  didCreateSlot,
+  resetDidCreateSlot,
+} from "./h";
 import { hasOwnPropery } from "../utils/objects";
 import { Dispatcher } from "./dispatcher";
+import { fillSlots } from "./slots";
 import equal from "fast-deep-equal";
 
 const emptyFn = () => {};
@@ -23,8 +29,19 @@ export function defineComponent({
     #parentComponent = null;
     #dispatcher = new Dispatcher();
     #subscriptions = [];
+    #children = [];
+
+    setExternalContent(children) {
+      this.#children = children;
+    }
+
     render() {
-      return render.call(this);
+      const vdom = render.call(this);
+      if (didCreateSlot) {
+        fillSlots(vdom, this.#children);
+        resetDidCreateSlot();
+      }
+      return vdom;
     }
 
     constructor(props = {}, eventHandlers = {}, parentComponent = null) {

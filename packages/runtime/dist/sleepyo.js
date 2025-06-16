@@ -135,6 +135,7 @@ const DOM_TYPES = {
   ELEMENT: "element",
   FRAGMENT: "fragment",
   COMPONENT: "component",
+  SLOT: "slot",
 };
 function hElement(tag, props = {}, children = []) {
   const type =
@@ -161,6 +162,12 @@ function hFragment(children = {}) {
   return {
     children: mapTextNodes(withoutNulls(children)),
     type: DOM_TYPES.FRAGMENT,
+  };
+}
+function hSlot(children = []) {
+  return {
+    children,
+    type: DOM_TYPES.SLOT,
   };
 }
 function extractChildren(vdom) {
@@ -381,9 +388,10 @@ function addProps(el, vdom, hostComponent) {
   setAttributes(el, attributes);
 }
 function createComponentNode(vdom, parentEl, index, hostComponent) {
-  const Component = vdom.tag;
+  const { tag: Component, children } = vdom;
   const { events, props } = extractPropsAndEvents(vdom);
   const component = new Component(props, events, hostComponent);
+  component.setExternalContent(children);
   component.mount(parentEl, index);
   vdom.component = component;
   vdom.el = component.firstElement;
@@ -624,6 +632,8 @@ function patchChildren(oldVdom, newVdom, hostComponent) {
 function patchComponent(oldVdom, newVdom) {
   const { component } = oldVdom;
   const { props } = extractPropsAndEvents(newVdom);
+  const { children } = newVdom;
+  component.setExternalContent(children);
   component.updateProps(props);
   newVdom.component = component;
   newVdom.el = component.firstElement;
@@ -661,6 +671,45 @@ class Dispatcher {
     }
     this.#afterHandlers.forEach((handler) => handler());
   }
+}
+
+function traverseDFS(
+  vdom,
+  shoudlSkipBranch = () => false,
+  processNode,
+  parentNode = null,
+  index = null
+) {
+  if (shoudlSkipBranch(vdom)) return;
+  processNode(vdom, parentNode, index);
+  if (vdom.children) {
+    vdom.children.forEach((child, i) => {
+      traverseDFS(child, shoudlSkipBranch, processNode, vdom, i);
+    });
+  }
+}
+
+function fillSlots(vdom, externalCotent = []) {
+  function processNode(node, parent, index) {
+    insertViewInSlot(node, parent, index, externalCotent);
+  }
+  traverseDFS(vdom, shoudlSkipBranch, processNode);
+}
+function insertViewInSlot(node, parent, index, externalCotent) {
+  if (node.type !== DOM_TYPES.SLOT) {
+    return;
+  }
+  const defaultContent = node.children;
+  const views = externalCotent.length > 0 ? externalCotent : defaultContent;
+  const hasContent = views.length > 0;
+  if (hasContent) {
+    parent.children.splice(index, 1, hFragment(views));
+  } else {
+    parent.children.splice(index, 1);
+  }
+}
+function shoudlSkipBranch(vdom) {
+  return vdom.type === DOM_TYPES.COMPONENT;
 }
 
 function getDefaultExportFromCjs (x) {
@@ -722,8 +771,16 @@ function defineComponent({
     #parentComponent = null;
     #dispatcher = new Dispatcher();
     #subscriptions = [];
+    #children = [];
+    setExternalContent(children) {
+      this.#children = children;
+    }
     render() {
-      return render.call(this);
+      const vdom = render.call(this);
+      {
+        fillSlots(vdom, this.#children);
+      }
+      return vdom;
     }
     constructor(props = {}, eventHandlers = {}, parentComponent = null) {
       this.props = props;
@@ -828,4 +885,4 @@ function defineComponent({
   return Component;
 }
 
-export { createApp, defineComponent, hElement, hFragment, hText, nextTick };
+export { createApp, defineComponent, hElement, hFragment, hSlot, hText, nextTick };

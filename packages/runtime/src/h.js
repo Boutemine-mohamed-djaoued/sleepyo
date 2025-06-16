@@ -5,6 +5,7 @@ export const DOM_TYPES = {
   ELEMENT: "element",
   FRAGMENT: "fragment",
   COMPONENT: "component",
+  SLOT: "slot",
 };
 
 export function hElement(tag, props = {}, children = []) {
@@ -35,6 +36,24 @@ export function hFragment(children = {}) {
   return {
     children: mapTextNodes(withoutNulls(children)),
     type: DOM_TYPES.FRAGMENT,
+  };
+}
+
+let hSlotCalled = false;
+
+export function didCreateSlot() {
+  return hSlotCalled;
+}
+
+export function resetDidCreateSlot() {
+  hSlotCalled = false;
+}
+
+export function hSlot(children = []) {
+  hSlotCalled = true;
+  return {
+    children,
+    type: DOM_TYPES.SLOT,
   };
 }
 

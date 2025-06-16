@@ -6,38 +6,30 @@
         hElement,
         hText,
         hFragment,
+        hSlot,
         defineComponent,
       } from "../../packages/runtime/dist/sleepyo.js";
 
-      const NameComponent = defineComponent({
-        onMounted() {
-          console.log(`Component mounted with name: ${this.props.name}`);
-        },
-        onUnmounted() {
-          console.log(`Component unmounted with name: ${this.props.name}`);
-        },
+      const Section = defineComponent({
         render() {
-          return hElement("p", {}, [this.props.name]);
-        },
-      });
-
-      const rootComponent = defineComponent({
-        render() {
-          return hFragment([
-            hElement(NameComponent, { name: "Alice" }),
-            hElement(NameComponent, { name: "Bob" }),
-            hElement(NameComponent, { name: "Charlie" }),
-            hElement(NameComponent, { name: "Diana" }),
-            hElement(NameComponent, { name: "Eve" }),
+          return hElement("section", {}, [
+            hSlot([hElement("p", {}, ["default shit"])]),
+            hSlot(),
           ]);
         },
       });
 
-      const app = createApp({ rootComponent });
-      app.mount(document.querySelector("body"));
-      setTimeout(() => {
-        app.unmount();
-      }, 2000);
+      const App = defineComponent({
+        render() {
+          return hElement("main", {}, [
+            hElement(Section, {}, [hElement("p", {}, ["will it really work"])]),
+            hElement(Section, {}),
+          ]);
+        },
+      });
+
+      const app = new App();
+      app.mount(document.body);
     </script>
 
     <title>Counter</title>
