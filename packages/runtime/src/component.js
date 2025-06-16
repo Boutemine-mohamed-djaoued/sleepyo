@@ -30,9 +30,18 @@ export function defineComponent({
     #dispatcher = new Dispatcher();
     #subscriptions = [];
     #children = [];
+    #appContext = null;
 
     setExternalContent(children) {
       this.#children = children;
+    }
+
+    setAppContext(appContext) {
+      this.#appContext = appContext;
+    }
+
+    get appContext() {
+      return this.#appContext;
     }
 
     render() {

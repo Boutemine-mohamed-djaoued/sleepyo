@@ -390,8 +390,11 @@ function addProps(el, vdom, hostComponent) {
 function createComponentNode(vdom, parentEl, index, hostComponent) {
   const { tag: Component, children } = vdom;
   const { events, props } = extractPropsAndEvents(vdom);
+  console.log(vdom);
+  console.log(Component);
   const component = new Component(props, events, hostComponent);
   component.setExternalContent(children);
+  component.setAppContext(hostComponent?.appContext ?? {});
   component.mount(parentEl, index);
   vdom.component = component;
   vdom.el = component.firstElement;
@@ -410,10 +413,258 @@ function createFragmentNode(vdom, parentEl, index, hostComponent) {
   parentEl.append(fragmentNode);
 }
 
-function createApp({ rootComponent, props = {} }) {
+const CATCH_ALL_ROUTE = "*";
+function makeRouteMatcher(route) {
+  return routeHasParams(route)
+    ? makeMatcherWithParams(route)
+    : makeMatcherWithoutParams(route);
+}
+function routeHasParams({ path }) {
+  return path.includes(":");
+}
+function makeMatcherWithoutParamsRegex({ path }) {
+  if ((path == CATCH_ALL_ROUTE)) {
+    return new RegExp("^.*$");
+  }
+  return new RegExp(`^${path}$`);
+}
+function makeMatcherWithParamsRegex({ path }) {
+  const regex = path.replace(
+    /:([^/]+)/g,
+    (_, paramName) => `(?<${paramName}>[^/]+)`
+  );
+  return new RegExp(`^${regex}$`);
+}
+function makeMatcherWithoutParams(route) {
+  const regex = makeMatcherWithoutParamsRegex(route);
+  const isRedirect = typeof route.redirect === "string";
+  return {
+    route,
+    isRedirect,
+    checkMatch(path) {
+      return regex.test(path);
+    },
+    extractParams() {
+      return {};
+    },
+    extractQuery,
+  };
+}
+function makeMatcherWithParams(route) {
+  const regex = makeMatcherWithParamsRegex(route);
+  const isRedirect = typeof route.redirect === "string";
+  return {
+    route,
+    isRedirect,
+    checkMatch(path) {
+      return regex.test(path);
+    },
+    extractParams(path) {
+      const { groups } = regex.exec(path);
+      return groups;
+    },
+    extractQuery,
+  };
+}
+function extractQuery(path) {
+  const queryIndex = path.indexOf("?");
+  if (queryIndex === -1) {
+    return {};
+  }
+  const search = new URLSearchParams(path.slice(queryIndex + 1));
+  console.log(search);
+  return Object.fromEntries(search.entries());
+}
+
+class Dispatcher {
+  #subs = new Map();
+  #afterHandlers = [];
+  subscribe(commandName, handler) {
+    if (!this.#subs.has(commandName)) {
+      this.#subs.set(commandName, []);
+    }
+    const handlers = this.#subs.get(commandName);
+    if (handlers.includes(handler)) {
+      return () => {};
+    }
+    handlers.push(handler);
+    return () => {
+      const idx = handlers.indexOf(handler);
+      handlers.splice(idx, 1);
+    };
+  }
+  afterEveryCommand(handler) {
+    this.#afterHandlers.push(handler);
+    return () => {
+      const idx = this.#afterHandlers.indexOf(handler);
+      this.#afterHandlers.splice(idx, 1);
+    };
+  }
+  dispatch(commandName, payload) {
+    if (this.#subs.has(commandName)) {
+      this.#subs.get(commandName).forEach((handler) => handler(payload));
+    } else {
+      console.warn(`No handlers for command: ${commandName}`);
+    }
+    this.#afterHandlers.forEach((handler) => handler());
+  }
+}
+
+const ROUTER_EVENT = "router-event";
+class HashRouter {
+  #matchers = [];
+  #isInitialized = false;
+  #matchedRoute = null;
+  #params = {};
+  #query = {};
+  #dispatcher = new Dispatcher();
+  #subscriptions = new WeakMap();
+  #subscriberFns = new Set();
+  get matchedRoute() {
+    return this.#matchedRoute;
+  }
+  get params() {
+    return this.#params;
+  }
+  get query() {
+    return this.#query;
+  }
+  constructor(routes = []) {
+    this.#matchers = routes.map(makeRouteMatcher);
+  }
+  subscribe(handler) {
+    const unsubscribe = this.#dispatcher.subscribe(ROUTER_EVENT, handler);
+    this.#subscriptions.set(handler, unsubscribe);
+    this.#subscriberFns.add(handler);
+  }
+  unsubscribe(handler) {
+    const unsubscribe = this.#subscriptions.get(handler);
+    if (unsubscribe) {
+      unsubscribe();
+      this.#subscriptions.delete(handler);
+      this.#subscriberFns.delete(handler);
+    }
+  }
+  #onPopState = () => this.#matchCurrentRoute();
+  get #currentRouteHash() {
+    const hash = document.location.hash;
+    if (hash === "") {
+      return "/";
+    }
+    return hash.slice(1);
+  }
+  #pushState(path) {
+    window.history.pushState({}, "", `#${path}`);
+  }
+  async init() {
+    if (this.#isInitialized) {
+      return;
+    }
+    if (document.location.hash === "") {
+      window.history.replaceState({}, "", "#/");
+    }
+    window.addEventListener("popstate", this.#onPopState);
+    await this.#matchCurrentRoute();
+    this.#isInitialized = true;
+  }
+  async navigateTo(path) {
+    console.log(`navigating to ${path}`);
+    const matcher = this.#matchers.find((matcher) => matcher.checkMatch(path));
+    if (matcher == null) {
+      console.warn(`[Router] no route matches path "${path}"`);
+      this.#matchedRoute = null;
+      this.#params = {};
+      this.#query = {};
+      return;
+    }
+    if (matcher.isRedirect) {
+      return this.navigateTo(matcher.route.redirect);
+    }
+    console.log({ matcher });
+    const { shouldNavigate, shouldRedirect, redirectPath } =
+      await this.#canChangeRoute(this.#currentRouteHash, path);
+    if (shouldRedirect) {
+      return this.navigateTo(redirectPath);
+    }
+    if (shouldNavigate) {
+      console.log("yes should navigate");
+      this.#matchedRoute = matcher.route;
+      console.log(this.#matchedRoute);
+      this.#params = matcher.extractParams(path);
+      this.#query = matcher.extractQuery(path);
+      this.#pushState(path);
+      this.#dispatcher.dispatch(ROUTER_EVENT, {
+        from: this.#currentRouteHash,
+        to: path,
+        router: this,
+      });
+    }
+  }
+  async #canChangeRoute(from, to) {
+    const guard = to.beforeEnter;
+    if (typeof guard !== "function") {
+      return {
+        shouldRedirect: false,
+        shouldNavigate: true,
+        redirectPath: null,
+      };
+    }
+    const result = await guard(from?.path, to?.path);
+    if (result === false) {
+      return {
+        shouldRedirect: false,
+        shouldNavigate: false,
+        redirectPath: null,
+      };
+    }
+    if (typeof result === "string") {
+      return {
+        shouldRedirect: true,
+        shouldNavigate: false,
+        redirectPath: result,
+      };
+    }
+    return {
+      shouldRedirect: false,
+      shouldNavigate: true,
+      redirectPath: null,
+    };
+  }
+  back() {
+    window.history.back();
+  }
+  forward() {
+    window.history.forward();
+  }
+  #matchCurrentRoute() {
+    return this.navigateTo(this.#currentRouteHash);
+  }
+  destroy() {
+    if (!this.#isInitialized) {
+      return;
+    }
+    window.removeEventListener("popstate", this.#onPopState);
+    this.#subscriberFns.forEach(this.unsubscribe, this);
+    this.#isInitialized = false;
+  }
+}
+class NoopRouter {
+  init() {}
+  destroy() {}
+  navigateTo() {}
+  back() {}
+  forward() {}
+  subscribe() {}
+  unsubscribe() {}
+}
+
+function createApp({ rootComponent, props = {}, options = {} }) {
   let parentEl = null;
   let isMounted = false;
   let vdom = null;
+  const context = {
+    router: options.router || new NoopRouter(),
+  };
   function reset() {
     parentEl = null;
     isMounted = false;
@@ -426,7 +677,8 @@ function createApp({ rootComponent, props = {} }) {
       }
       parentEl = _parentEl;
       vdom = hElement(rootComponent, props);
-      mountDOM(vdom, parentEl);
+      mountDOM(vdom, parentEl, null, { appContext: context });
+      context.router.init();
       isMounted = true;
     },
     unmount() {
@@ -434,6 +686,7 @@ function createApp({ rootComponent, props = {} }) {
         throw new Error("The application is not mounted");
       }
       destroyDom(vdom);
+      context.router.destroy();
       reset();
     },
   };
@@ -639,40 +892,6 @@ function patchComponent(oldVdom, newVdom) {
   newVdom.el = component.firstElement;
 }
 
-class Dispatcher {
-  #subs = new Map();
-  #afterHandlers = [];
-  subscribe(commandName, handler) {
-    if (!this.#subs.has(commandName)) {
-      this.#subs.set(commandName, []);
-    }
-    const handlers = this.#subs.get(commandName);
-    if (handlers.includes(handler)) {
-      return () => {};
-    }
-    handlers.push(handler);
-    return () => {
-      const idx = handlers.indexOf(handler);
-      handlers.splice(idx, 1);
-    };
-  }
-  afterEveryCommand(handler) {
-    this.#afterHandlers.push(handler);
-    return () => {
-      const idx = this.#afterHandlers.indexOf(handler);
-      this.#afterHandlers.splice(idx, 1);
-    };
-  }
-  dispatch(commandName, payload) {
-    if (this.#subs.has(commandName)) {
-      this.#subs.get(commandName).forEach((handler) => handler(payload));
-    } else {
-      console.warn(`No handlers for command: ${commandName}`);
-    }
-    this.#afterHandlers.forEach((handler) => handler());
-  }
-}
-
 function traverseDFS(
   vdom,
   shoudlSkipBranch = () => false,
@@ -772,8 +991,15 @@ function defineComponent({
     #dispatcher = new Dispatcher();
     #subscriptions = [];
     #children = [];
+    #appContext = null;
     setExternalContent(children) {
       this.#children = children;
+    }
+    setAppContext(appContext) {
+      this.#appContext = appContext;
+    }
+    get appContext() {
+      return this.#appContext;
     }
     render() {
       const vdom = render.call(this);
@@ -885,4 +1111,57 @@ function defineComponent({
   return Component;
 }
 
-export { createApp, defineComponent, hElement, hFragment, hSlot, hText, nextTick };
+const RouterLink = defineComponent({
+  render() {
+    const { to } = this.props;
+    return hElement(
+      "a",
+      {
+        href: to,
+        on: {
+          click: (e) => {
+            e.preventDefault();
+            this.appContext.router.navigateTo(to);
+          },
+        },
+      },
+      [hSlot()]
+    );
+  },
+});
+const RouterOutlet = defineComponent({
+  state() {
+    return {
+      matchedRoute: null,
+      subscription: null,
+    };
+  },
+  onMounted() {
+    const subscription = this.appContext.router.subscribe(({ to }) => {
+      console.log("received event");
+      console.log(this.appContext.router.matchedRoute);
+      this.handleRouteChange(to);
+    });
+    this.updateState({ subscription });
+  },
+  onUnmounted() {
+    const { subscription } = this.state;
+    this.appContext.router.unsubscribe(subscription);
+  },
+  handleRouteChange(matchedRoute) {
+    this.updateState({ matchedRoute });
+  },
+  render() {
+    const { matchedRoute } = this.state;
+    console.log(matchedRoute);
+    console.log(this.appContext);
+    console.log({ mmm: this.matchedRoute });
+    return hElement("div", { id: "router-outlet" }, [
+      matchedRoute
+        ? hElement(this.appContext.router.matchedRoute.component)
+        : null,
+    ]);
+  },
+});
+
+export { HashRouter, RouterLink, RouterOutlet, createApp, defineComponent, hElement, hFragment, hSlot, hText, nextTick };

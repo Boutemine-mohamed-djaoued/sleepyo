@@ -8,27 +8,65 @@
         hFragment,
         hSlot,
         defineComponent,
+        HashRouter,
+        RouterLink,
+        RouterOutlet,
       } from "../../packages/runtime/dist/sleepyo.js";
 
-      const Section = defineComponent({
-        render() {
-          return hElement("section", {}, [
-            hSlot([hElement("p", {}, ["default shit"])]),
-            hSlot(),
-          ]);
-        },
-      });
-
-      const App = defineComponent({
+      const rootComponent = defineComponent({
         render() {
           return hElement("main", {}, [
-            hElement(Section, {}, [hElement("p", {}, ["will it really work"])]),
-            hElement(Section, {}),
+            hElement("nav", {}, [
+              hElement(RouterLink, { to: "/home" }, ["home "]),
+              hElement(RouterLink, { to: "/about" }, ["about "]),
+              hElement(RouterLink, { to: "/profile" }, ["profile "]),
+            ]),
+            hElement(RouterOutlet, {}),
           ]);
         },
       });
 
-      const app = new App();
+      const home = defineComponent({
+        render() {
+          return hElement("div", {}, ["home"]);
+        },
+      });
+
+      const about = defineComponent({
+        render() {
+          return hElement("div", {}, ["about"]);
+        },
+      });
+
+      const profile = defineComponent({
+        render() {
+          return hElement("div", {}, ["profile"]);
+        },
+      });
+
+      const router = new HashRouter([
+        {
+          path: "/home",
+          component: home,
+        },
+        {
+          path: "/about",
+          component: about,
+        },
+        {
+          path: "/profile",
+          component: profile,
+        },
+        {
+          path: "*",
+          component: home,
+        },
+      ]);
+
+      const app = createApp({
+        rootComponent,
+        options: { router },
+      });
       app.mount(document.body);
     </script>
 
