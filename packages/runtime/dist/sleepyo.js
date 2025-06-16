@@ -225,6 +225,13 @@ function processJobs() {
   }
   isScheduled = false;
 }
+function nextTick() {
+  scheduleUpdate();
+  return flushPromises();
+}
+function flushPromises() {
+  return new Promise((resolve) => setTimeout(resolve));
+}
 
 function destroyDom(vdom) {
   switch (vdom.type) {
@@ -821,4 +828,4 @@ function defineComponent({
   return Component;
 }
 
-export { createApp, defineComponent, hElement, hFragment, hText };
+export { createApp, defineComponent, hElement, hFragment, hText, nextTick };
