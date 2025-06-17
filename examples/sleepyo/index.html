@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SleepyO Framework Demo</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        transition: background 0.3s ease;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        line-height: 1.6;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        min-height: 100vh;
+        padding: 2rem;
+      }
+
+      body.dark {
+        background: linear-gradient(135deg, #2c3e50 0%, #1a1a2e 100%);
+        color: #f0f0f0;
+      }
+
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 2rem;
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(10px);
+      }
+
+      .dark .container {
+        background: rgba(30, 30, 46, 0.9);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid #eee;
+      }
+
+      .dark header {
+        border-bottom: 1px solid #444;
+      }
+
+      h1 {
+        font-size: 2.5rem;
+        background: linear-gradient(90deg, #6a11cb 0%, #2575fc 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.5rem;
+      }
+
+      nav {
+        display: flex;
+        gap: 1rem;
+        margin: 1.5rem 0;
+      }
+
+      nav a {
+        text-decoration: none;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        background: #eef2ff;
+        color: #4f46e5;
+        font-weight: 500;
+      }
+
+      .dark nav a {
+        background: #312e81;
+        color: #818cf8;
+      }
+
+      nav a:hover {
+        background: #4f46e5;
+        color: white;
+      }
+
+      .dark nav a:hover {
+        background: #818cf8;
+        color: #1e1b4b;
+      }
+
+      .card {
+        background: white;
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        margin-bottom: 2rem;
+      }
+
+      .dark .card {
+        background: #1e293b;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+      }
+
+      .counter-display {
+        font-size: 5rem;
+        font-weight: bold;
+        text-align: center;
+        margin: 1rem 0;
+        color: #4f46e5;
+      }
+
+      .dark .counter-display {
+        color: #818cf8;
+      }
+
+      .controls {
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+        margin-top: 1rem;
+      }
+
+      button {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 8px;
+        background: #4f46e5;
+        color: white;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+
+      .dark button {
+        background: #818cf8;
+        color: #1e1b4b;
+      }
+
+      button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(79, 70, 229, 0.3);
+      }
+
+      .dark button:hover {
+        box-shadow: 0 4px 8px rgba(129, 140, 248, 0.4);
+      }
+
+      button:active {
+        transform: translateY(0);
+      }
+
+      .theme-toggle {
+        background: #e0e7ff;
+        color: #4f46e5;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+      }
+
+      .dark .theme-toggle {
+        background: #312e81;
+        color: #818cf8;
+      }
+
+      footer {
+        text-align: center;
+        margin-top: 3rem;
+        padding-top: 1rem;
+        border-top: 1px solid #eee;
+        color: #666;
+        font-size: 0.9rem;
+      }
+
+      .dark footer {
+        border-top: 1px solid #444;
+        color: #aaa;
+      }
+
+      .home-content {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+        margin-top: 2rem;
+      }
+
+      .feature {
+        padding: 1.5rem;
+        border-radius: 12px;
+        background: #f0f9ff;
+      }
+
+      .dark .feature {
+        background: #0c4a6e;
+      }
+
+      .feature h3 {
+        margin-bottom: 0.5rem;
+        color: #0369a1;
+      }
+
+      .dark .feature h3 {
+        color: #7dd3fc;
+      }
+
+      @media (max-width: 600px) {
+        .home-content {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script type="module">
+      import {
+        createApp,
+        defineComponent,
+        hElement,
+        hFragment,
+        hText,
+        HashRouter,
+        RouterLink,
+        RouterOutlet,
+        nextTick,
+      } from "../../packages/runtime/dist/sleepyo.js";
+
+      // Theme toggle component
+      const ThemeToggle = defineComponent({
+        render() {
+          return hElement(
+            "button",
+            {
+              class: "theme-toggle",
+              on: { click: () => this.toggleTheme() },
+            },
+            [hElement("span", {}, [this.isDark ? "🌙 Dark" : "☀️ Light"])]
+          );
+        },
+
+        state() {
+          return { isDark: false };
+        },
+
+        toggleTheme() {
+          this.updateState({ isDark: !this.state.isDark });
+          document.body.classList.toggle("dark", this.state.isDark);
+        },
+      });
+
+      // Counter component
+      const Counter = defineComponent({
+        render() {
+          return hElement("div", { class: "card" }, [
+            hElement("h2", {}, ["Interactive Counter"]),
+            hElement("div", { class: "counter-display" }, [
+              this.state.count.toString(),
+            ]),
+            hElement("div", { class: "controls" }, [
+              hElement(
+                "button",
+                {
+                  on: { click: () => this.increment() },
+                },
+                ["+"]
+              ),
+              hElement(
+                "button",
+                {
+                  on: { click: () => this.decrement() },
+                },
+                ["-"]
+              ),
+              hElement(
+                "button",
+                {
+                  on: { click: () => this.reset() },
+                },
+                ["Reset"]
+              ),
+            ]),
+            hElement("p", {}, [
+              "Try clicking fast! The framework batches updates for optimal performance.",
+            ]),
+          ]);
+        },
+
+        state() {
+          return { count: 0 };
+        },
+
+        increment() {
+          this.updateState({ count: this.state.count + 1 });
+        },
+
+        decrement() {
+          this.updateState({ count: this.state.count - 1 });
+        },
+
+        reset() {
+          this.updateState({ count: 0 });
+        },
+      });
+
+      // Home page component
+      const HomePage = defineComponent({
+        render() {
+          return hFragment([
+            hElement("h2", {}, ["Welcome to SleepyO Framework"]),
+            hElement("p", {}, [
+              "A minimal yet powerful JavaScript framework for building reactive web applications.",
+            ]),
+            hElement("div", { class: "home-content" }, [
+              hElement("div", { class: "feature" }, [
+                hElement("h3", {}, ["Reactive Components"]),
+                hElement("p", {}, [
+                  "Build encapsulated components that manage their own state with a simple API.",
+                ]),
+              ]),
+              hElement("div", { class: "feature" }, [
+                hElement("h3", {}, ["Virtual DOM"]),
+                hElement("p", {}, [
+                  "Efficient updates with a lightweight virtual DOM and smart diffing algorithm.",
+                ]),
+              ]),
+              hElement("div", { class: "feature" }, [
+                hElement("h3", {}, ["Router"]),
+                hElement("p", {}, [
+                  "Built-in router with navigation guards and dynamic route matching.",
+                ]),
+              ]),
+              hElement("div", { class: "feature" }, [
+                hElement("h3", {}, ["Lightweight"]),
+                hElement("p", {}, [
+                  "Less than 10kb gzipped with zero dependencies.",
+                ]),
+              ]),
+            ]),
+            hElement("div", { style: { marginTop: "2rem" } }, [
+              hElement(Counter),
+            ]),
+          ]);
+        },
+      });
+
+      // About page component
+      const AboutPage = defineComponent({
+        render() {
+          return hFragment([
+            hElement("h2", {}, ["About SleepyO"]),
+            hElement("p", {}, [
+              "SleepyO is designed to be simple yet powerful, providing the essential tools for modern web development without the bloat.",
+            ]),
+            hElement("div", { class: "card" }, [
+              hElement("h3", {}, ["Core Principles"]),
+              hElement("ul", {}, [
+                hElement("li", {}, ["Simplicity over complexity"]),
+                hElement("li", {}, ["Performance by default"]),
+                hElement("li", {}, ["Intuitive API design"]),
+                hElement("li", {}, ["Progressive adoption"]),
+              ]),
+            ]),
+            hElement("div", { class: "card" }, [
+              hElement("h3", {}, ["Features"]),
+              hElement("ul", {}, [
+                hElement("li", {}, ["Reactive component system"]),
+                hElement("li", {}, ["Lightweight virtual DOM"]),
+                hElement("li", {}, ["Component lifecycle hooks"]),
+                hElement("li", {}, ["Built-in state management"]),
+                hElement("li", {}, ["Router with navigation guards"]),
+                hElement("li", {}, ["Event handling system"]),
+              ]),
+            ]),
+          ]);
+        },
+      });
+
+      // Main App component
+      const App = defineComponent({
+        render() {
+          return hElement("div", { class: "container" }, [
+            hElement("header", {}, [
+              hElement("div", {}, [
+                hElement("h1", {}, ["SleepyO Framework"]),
+                hElement("p", {}, ["A minimal reactive JavaScript framework"]),
+              ]),
+              hElement(ThemeToggle),
+            ]),
+
+            hElement("nav", {}, [
+              hElement(RouterLink, { to: "/" }, ["Home"]),
+              hElement(RouterLink, { to: "/about" }, ["About"]),
+            ]),
+
+            hElement("main", {}, [hElement(RouterOutlet)]),
+
+            hElement("footer", {}, [
+              hElement("p", {}, [
+                `© ${new Date().getFullYear()} SleepyO Framework Demo`,
+              ]),
+              hElement("p", {}, ["Built with ❤️ for modern web development"]),
+            ]),
+          ]);
+        },
+      });
+
+      // Set up router
+      const router = new HashRouter([
+        { path: "/", component: HomePage },
+        { path: "/about", component: AboutPage },
+        { path: "*", redirect: "/" },
+      ]);
+
+      // Create and mount app
+      const app = createApp({
+        rootComponent: App,
+        options: { router },
+      });
+
+      app.mount(document.getElementById("app"));
+
+      // Display a welcome message in console
+      nextTick().then(() => {
+        console.log(
+          "%cSleepyO Framework Demo 🦉",
+          "font-size: 18px; font-weight: bold; color: #4f46e5;"
+        );
+        console.log("Try interacting with the counter and switching themes!");
+      });
+    </script>
+  </body>
+</html>

@@ -69,8 +69,6 @@ function addProps(el, vdom, hostComponent) {
 function createComponentNode(vdom, parentEl, index, hostComponent) {
   const { tag: Component, children } = vdom;
   const { events, props } = extractPropsAndEvents(vdom);
-  console.log(vdom);
-  console.log(Component);
   const component = new Component(props, events, hostComponent);
 
   component.setExternalContent(children);

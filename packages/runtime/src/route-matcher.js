@@ -10,9 +10,8 @@ function routeHasParams({ path }) {
   return path.includes(":");
 }
 
-
 function makeMatcherWithoutParamsRegex({ path }) {
-  if ((path == CATCH_ALL_ROUTE)) {
+  if (path == CATCH_ALL_ROUTE) {
     return new RegExp("^.*$");
   }
   return new RegExp(`^${path}$`);
@@ -69,8 +68,6 @@ function extractQuery(path) {
   }
 
   const search = new URLSearchParams(path.slice(queryIndex + 1));
-
-  console.log(search);
 
   return Object.fromEntries(search.entries());
 }

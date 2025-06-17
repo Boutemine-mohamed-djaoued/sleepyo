@@ -75,7 +75,6 @@ export class HashRouter {
   }
 
   async navigateTo(path) {
-    console.log(`navigating to ${path}`);
     const matcher = this.#matchers.find((matcher) => matcher.checkMatch(path));
 
     if (matcher == null) {
@@ -92,19 +91,15 @@ export class HashRouter {
       return this.navigateTo(matcher.route.redirect);
     }
 
-    console.log({ matcher });
-
     const { shouldNavigate, shouldRedirect, redirectPath } =
-      await this.#canChangeRoute(this.#currentRouteHash, path);
+      await this.#canChangeRoute(this.#currentRouteHash, matcher.route);
 
     if (shouldRedirect) {
       return this.navigateTo(redirectPath);
     }
 
     if (shouldNavigate) {
-      console.log("yes should navigate");
       this.#matchedRoute = matcher.route;
-      console.log(this.#matchedRoute);
       this.#params = matcher.extractParams(path);
       this.#query = matcher.extractQuery(path);
       this.#pushState(path);

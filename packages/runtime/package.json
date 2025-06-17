@@ -1,14 +1,20 @@
 {
   "name": "sleepyo",
   "version": "5.0.0",
-  "main": "dist/sleepyo.js",
+  "main": "./dist/sleepyo.js",
+  "exports": {
+    ".": {
+      "import": "./dist/sleepyo.esm.js",
+      "require": "./dist/sleepyo.js"
+    }
+  },
   "files": [
     "dist/sleepyo.js"
   ],
   "type": "module",
   "scripts": {
     "prepack": "npm run build",
-    "build": "rollup -c",
+    "build": "rollup -c --bundleConfigAsCjs",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "test": "vitest",
@@ -30,6 +36,7 @@
     "vitest": "^3.0.4"
   },
   "dependencies": {
+    "@rollup/plugin-alias": "^5.1.1",
     "fast-deep-equal": "^3.1.3"
   }
 }

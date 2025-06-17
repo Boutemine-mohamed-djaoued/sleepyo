@@ -1,77 +1,75 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
   <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
     <script type="module">
       import {
-        createApp,
         hElement,
-        hText,
-        hFragment,
-        hSlot,
-        defineComponent,
+        createApp,
         HashRouter,
         RouterLink,
         RouterOutlet,
+        defineComponent,
       } from "../../packages/runtime/dist/sleepyo.js";
 
-      const rootComponent = defineComponent({
+      const Home = defineComponent({
         render() {
-          return hElement("main", {}, [
+          return hElement("h1", {}, ["Home Page"]);
+        },
+      });
+
+      const About = defineComponent({
+        render() {
+          return hElement("h1", {}, ["About Page"]);
+        },
+      });
+      const User = defineComponent({
+        render() {
+          const { id } = this.appContext.router.params;
+          return hElement("h1", {}, [`User: ${id}`]);
+        },
+      });
+
+      // Setup routes
+      const routes = [
+        { path: "/", component: Home },
+        { path: "/about", component: About },
+        {
+          path: "/user/:id",
+          component: User,
+          beforeEnter: (from, to) => {
+            return true;
+          },
+        },
+        { path: "/old-path", redirect: "/" },
+      ];
+
+      const router = new HashRouter(routes);
+
+      // Main app component
+      const App = defineComponent({
+        render() {
+          return hElement("div", {}, [
             hElement("nav", {}, [
-              hElement(RouterLink, { to: "/home" }, ["home "]),
-              hElement(RouterLink, { to: "/about" }, ["about "]),
-              hElement(RouterLink, { to: "/profile" }, ["profile "]),
+              hElement(RouterLink, { to: "/" }, ["Home "]),
+              hElement(RouterLink, { to: "/about" }, ["About "]),
+              hElement(RouterLink, { to: "/user/123" }, ["User 123"]),
             ]),
-            hElement(RouterOutlet, {}),
+            hElement(RouterOutlet),
           ]);
         },
       });
 
-      const home = defineComponent({
-        render() {
-          return hElement("div", {}, ["home"]);
-        },
-      });
-
-      const about = defineComponent({
-        render() {
-          return hElement("div", {}, ["about"]);
-        },
-      });
-
-      const profile = defineComponent({
-        render() {
-          return hElement("div", {}, ["profile"]);
-        },
-      });
-
-      const router = new HashRouter([
-        {
-          path: "/home",
-          component: home,
-        },
-        {
-          path: "/about",
-          component: about,
-        },
-        {
-          path: "/profile",
-          component: profile,
-        },
-        {
-          path: "*",
-          component: home,
-        },
-      ]);
-
+      // Create app with router
       const app = createApp({
-        rootComponent,
+        rootComponent: App,
         options: { router },
       });
+
       app.mount(document.body);
     </script>
-
-    <title>Counter</title>
   </head>
-
   <body></body>
 </html>

@@ -31,8 +31,6 @@ export const RouterOutlet = defineComponent({
 
   onMounted() {
     const subscription = this.appContext.router.subscribe(({ to }) => {
-      console.log("received event");
-      console.log(this.appContext.router.matchedRoute);
       this.handleRouteChange(to);
     });
 
@@ -50,9 +48,6 @@ export const RouterOutlet = defineComponent({
 
   render() {
     const { matchedRoute } = this.state;
-    console.log(matchedRoute);
-    console.log(this.appContext);
-    console.log({ mmm: this.matchedRoute });
     return hElement("div", { id: "router-outlet" }, [
       matchedRoute
         ? hElement(this.appContext.router.matchedRoute.component)
